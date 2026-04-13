@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ChunkCleaner">
+    <output-path>$USER_HOME$/Desktop/Test Server/Testing 1.21.11/Plugins</output-path>
+    <root id="archive" name="ChunkCleaner.jar">
+      <element id="module-output" name="ChunkCleaner" />
+    </root>
+  </artifact>
+</component>
