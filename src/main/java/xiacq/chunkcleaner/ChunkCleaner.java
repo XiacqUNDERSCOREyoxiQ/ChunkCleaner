@@ -36,6 +36,7 @@ public class ChunkCleaner extends JavaPlugin {
     private void setDefaultConfig() {
         FileConfiguration fileConfiguration = instance.getConfig();
         fileConfiguration.addDefault("prefix", "§5CC §8| §f");
+        fileConfiguration.addDefault("inhibited_time", 60);
         fileConfiguration.options().copyDefaults(true);
         instance.saveConfig();
     }

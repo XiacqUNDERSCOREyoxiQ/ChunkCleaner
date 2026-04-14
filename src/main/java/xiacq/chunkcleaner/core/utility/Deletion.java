@@ -6,7 +6,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.generator.ChunkGenerator;
 import xiacq.chunkcleaner.ChunkCleaner;
 
 import java.io.*;
@@ -27,17 +26,19 @@ public class Deletion {
     private final int TO_CHECK_FOR_TIME;
 
 
-    public Deletion(CommandSender sender, boolean resume, World world, int toCheckForTime) {
+    public Deletion(CommandSender sender, World world, int toCheckForTime) {
         this.MANIFEST_FILE = new File(ChunkCleaner.getInstance().getDataFolder(), "manifest_of_CC.txt");
         this.WORLD = world;
         this.USER = sender;
         this.TO_CHECK_FOR_TIME = toCheckForTime;
+    }
 
-        startDeletion(resume);
+    public void startDeletionSinge() {
+        //SINGLE CHUNK DELETION
     }
 
 
-    void startDeletion(boolean tryToResume) {
+    public void startDeletion(boolean tryToResume) {
         List<File> regionFilesFromManifest = new ArrayList<>();
         if(tryToResume) { //Check for resume
             if (!MANIFEST_FILE.exists()) {
@@ -48,7 +49,8 @@ public class Deletion {
                 try (BufferedReader reader = new BufferedReader(new FileReader(MANIFEST_FILE))) {
                     String currentLine;
                     while ((currentLine = reader.readLine()) != null) {
-                        if (currentLine.trim().isEmpty()) continue; //SKIP
+                        if (currentLine.trim().isEmpty())
+                            continue; //SKIP
                         File file = new File(currentLine);
                         if (file.exists())
                             regionFilesFromManifest.add(file);
@@ -71,9 +73,10 @@ public class Deletion {
             }
         } else
             createNewManifestAndQueue();
-
-
     }
+
+
+
 
     private  File getRegionFolder(World world) {
        File worldFolder = world.getWorldFolder();
@@ -164,8 +167,8 @@ public class Deletion {
                         int chunkX = regionX  * 32 + localX;
                         int chunkZ  = regionZ * 32 + localZ;
 
-                        if(!Bukkit.getOnlinePlayers()
-                                .stream().anyMatch(p ->
+                        if(Bukkit.getOnlinePlayers()
+                                .stream().noneMatch(p ->
                                         p.getLocation().getChunk().getX() == chunkX && p.getLocation().getChunk().getZ() == chunkZ))
                             chunksToDelete.add(new ChunkCoordinates(chunkX, chunkZ));
                     }
@@ -228,8 +231,7 @@ public class Deletion {
             byte tagType = dataInputStream.readByte();
             if(tagType == 0)
                 break;
-            int nameLen = dataInputStream.readUnsignedShort();
-            byte[] nameBytes = new byte[nameLen];
+            byte[] nameBytes = new byte[dataInputStream.readUnsignedShort()];
             dataInputStream.readFully(nameBytes);
             String name = new String(nameBytes);
 
@@ -255,20 +257,17 @@ public class Deletion {
             byte tagType = dataInputStream.readByte();
             if(tagType == 0)
                 break;
-
-            int nameLen = dataInputStream.readUnsignedShort();
-            byte[] namesBytes = new byte[nameLen];
-            dataInputStream.readFully(namesBytes);
-            String name = new String(namesBytes);
-
+            byte[] nameBytes = new byte[dataInputStream.readUnsignedShort()];
+            dataInputStream.readFully(nameBytes);
+            String name = new String(nameBytes);
             if(tagType == 10 && name.equals("Level"))
                 return parseChunkData(dataInputStream);
             else
                 skipTagPayload(dataInputStream, tagType);
-
         }
         return new ChunkData();
     }
+
     private void skipTagPayload(DataInputStream data, byte tagType) throws IOException {
         switch (tagType) {
             case 1 -> data.skipBytes(1);  // TAG_Byte
@@ -304,7 +303,6 @@ public class Deletion {
         String[] split = name.split("[_.]"); // split on either dot or underscore
         return Integer.parseInt(split[xOrz - 1]);
    }
-    private void sendMessage(String message) {}
     private void updateActionBar(int done, int total) {
         for(Player player : Bukkit.getOnlinePlayers())
             if(player.isOp())

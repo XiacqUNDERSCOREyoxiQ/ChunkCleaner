@@ -9,10 +9,6 @@ import org.jspecify.annotations.NonNull;
 import xiacq.chunkcleaner.ChunkCleaner;
 import xiacq.chunkcleaner.core.utility.Deletion;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
 public class DeleteChunksCommand implements CommandExecutor {
 
     @Override
@@ -27,12 +23,12 @@ public class DeleteChunksCommand implements CommandExecutor {
                 World world = Bukkit.getWorld(args[0]);
 
                 if(args.length == 1)
-                    startDeletion(sender, world);
+                    startDeletion(sender, world, false);
                 else
                     if(args[1].equalsIgnoreCase("new"))
-                        startDeletion(sender, world);
+                        startDeletion(sender, world, false);
                     else if(args[1].equalsIgnoreCase("resume"))
-                        sender.sendMessage("nothing here yet");
+                        startDeletion(sender, world, true);
                     else
                         sender.sendMessage(ChunkCleaner.PREFIX + "The argument you've provided is not available | Please chose either new or resume");
             } else
@@ -41,21 +37,11 @@ public class DeleteChunksCommand implements CommandExecutor {
             sender.sendMessage(ChunkCleaner.PREFIX + "You don't have the required permission to execute this command!");
         return false;
     }
-
-
     private boolean containsWorld(String worldName) {
         for(World worlds : Bukkit.getWorlds())
             if(worlds.getName().equals(worldName))
                 return true;
         return false;
     }
-
-
-    private void startDeletion(CommandSender sender, World world) {
-         new Deletion(sender, false, world, 60);
-
-
-    }
-
-
+    private void startDeletion(CommandSender sender, World world, boolean resume) {new Deletion(sender, world, ChunkCleaner.getInstance().getConfig().getInt("inhibited_time")).startDeletion(resume);}
 }
