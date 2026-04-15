@@ -3,10 +3,12 @@ package xiacq.chunkcleaner.core.utility;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
 import xiacq.chunkcleaner.ChunkCleaner;
+import xiacq.chunkcleaner.listener.ChunkListener;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -23,18 +25,51 @@ public class Deletion {
     private final File MANIFEST_FILE;
     private final CommandSender USER;
     private final World WORLD;
-    private final int TO_CHECK_FOR_TIME;
+    private final int TO_CHECK_FOR_TIME = ChunkCleaner.getInstance().getConfig().getInt("inhibited_time");
 
 
-    public Deletion(CommandSender sender, World world, int toCheckForTime) {
+    public Deletion(CommandSender sender, World world) {
         this.MANIFEST_FILE = new File(ChunkCleaner.getInstance().getDataFolder(), "manifest_of_CC.txt");
         this.WORLD = world;
         this.USER = sender;
-        this.TO_CHECK_FOR_TIME = toCheckForTime;
     }
 
     public void startDeletionSinge() {
-        //SINGLE CHUNK DELETION
+        List<File> delete = new ArrayList<>();
+        for(Chunk chunks : ChunkListener.CHUNKS_TO_LOCK_AT.keySet()) {
+
+            if(ChunkListener.CHUNKS_TO_LOCK_AT.get(chunks))
+                continue;
+
+            for (Entity entities : chunks.getEntities())
+                if (entities instanceof Player
+                        || entities.getCustomName() != null
+                        || entities instanceof ItemFrame
+                        || (entities instanceof Tameable tameable && tameable.isTamed())
+                        || entities instanceof Minecart)
+                    continue; //Cancel it because of the
+                else
+                    entities.remove();
+
+            int chunkX = chunks.getX();
+            int chunkZ = chunks.getZ();
+
+            File regionFolder = getRegionFolder(chunks.getWorld());
+            int regionX = Math.floorDiv(chunkX, 32);
+            int regionZ = Math.floorDiv(chunkZ, 32);
+
+            File regionFile = new File(regionFolder, "r." + regionX + "." + regionZ + ".mca");
+
+            if (!regionFile.exists()) {
+                ChunkCleaner.getInstance().getLogger().severe("There was an error during automatic chunk deletion! | The file was not found.");
+                continue;
+            }
+
+            if(delete.isEmpty() || !delete.contains(regionFile))
+                delete.add(regionFile);
+        }
+        for(File file : delete)
+            processFile(file);
     }
 
 
@@ -111,78 +146,80 @@ public class Deletion {
             USER.sendMessage(ChunkCleaner.PREFIX + "Region folder not found or there it's one dir down. §cAborting...");
     }
 
-    private void processFiles(List<File> regionFiles, int totalFiles) {
-            if(regionFiles.isEmpty()) {
-                USER.sendMessage(ChunkCleaner.PREFIX + "All region files have been processed. Deleting the manifest.");
-                MANIFEST_FILE.delete();
-                return;
-            }
 
-            File regionFile = regionFiles.remove(0);
-            int processed = totalFiles - regionFiles.size();
+    private void processFiles(List<File> regionFiles, int totalFiles) {
+        if (regionFiles.isEmpty()) {
+            USER.sendMessage(ChunkCleaner.PREFIX + "All region files have been processed. Deleting the manifest.");
+            MANIFEST_FILE.delete();
+            return;
+        }
+
+        File regionFile = regionFiles.remove(0);
+        int processed = totalFiles - regionFiles.size();
 
         Bukkit.getScheduler().runTaskAsynchronously(ChunkCleaner.getInstance(), () -> {
-            Set<ChunkCoordinates> chunksToDelete = new HashSet<>();
-            int totalChunksInFile = 0;
-            try (FileChannel channel = FileChannel.open(regionFile.toPath(), StandardOpenOption.READ)){
-                if(channel.size() < 8192) {
-                    ChunkCleaner.getInstance().getLogger().warning("Skipping empty or invalid region file | " + regionFile.getName());
-                    updateManifest(regionFiles);
-                    updateActionBar(processed, totalFiles);
-                    processFiles(regionFiles, totalFiles);
-                    return;
-                }
-                //REBUILDING HEADER TO PREVENT DAMAGE
-                ByteBuffer header = ByteBuffer.allocate(4096);
-                channel.read(header);
-                header.flip();
-                for(int i = 0; i < 1024; i++) {
-                    int entry = header.getInt(i*4);//HEXA Steps
-                    if(entry == 0)
-                        continue;
-                    totalChunksInFile++;
-                    int locationOffset = (entry >> 8) * 4096;
-                    ByteBuffer chunkHeader = ByteBuffer.allocate(5);
-                    channel.read(chunkHeader, locationOffset);
-                    chunkHeader.flip();
-                    int chunkLength = chunkHeader.getInt() -1;
-                    byte compressionType = chunkHeader.get();
-                    if(chunkLength <= 0)
-                        continue;
-
-                    if(compressionType != 2) {
-                        ChunkCleaner.getInstance().getLogger().warning("Other compression type at index " + i + " in region file " + regionFile.getName() + " | The other compression type: " + compressionType);
-                        continue;
-                    }
-
-                    ByteBuffer chunkDataBuffer = ByteBuffer.allocate(chunkLength);
-                    channel.read(chunkDataBuffer, locationOffset + 5);
-                    chunkDataBuffer.flip();
-
-                    if(shouldDeleteChunk(chunkDataBuffer)) {
-                        int regionX = getRegion(regionFile, 1);
-                        int regionZ = getRegion(regionFile, 2);
-                        int localX = i % 32;
-                        int localZ = i / 32;
-                        int chunkX = regionX  * 32 + localX;
-                        int chunkZ  = regionZ * 32 + localZ;
-
-                        if(Bukkit.getOnlinePlayers()
-                                .stream().noneMatch(p ->
-                                        p.getLocation().getChunk().getX() == chunkX && p.getLocation().getChunk().getZ() == chunkZ))
-                            chunksToDelete.add(new ChunkCoordinates(chunkX, chunkZ));
-                    }
-                }
-                handleFileModification(regionFile, chunksToDelete, totalChunksInFile);
-            } catch (IOException ioException) {
-                USER.sendMessage(ChunkCleaner.PREFIX + "Failed to process region file " +regionFile.getName() + " see the console for more information!");
-                ChunkCleaner.getInstance().getLogger().severe("Failed to process region file "+regionFile.getName()  + " due to | " + ioException.getMessage());
-            }
-                    updateManifest(regionFiles);
-                    updateActionBar(processed, totalFiles);
-                    processFiles(regionFiles, totalFiles);
+            processFile(regionFile);
+            updateManifest(regionFiles);
+            updateActionBar(processed, totalFiles);
+            processFiles(regionFiles, totalFiles);
         });
     }
+
+    private void processFile(File regionFile) {
+        Set<ChunkCoordinates> chunksToDelete = new HashSet<>();
+        int totalChunksInFile = 0;
+        try (FileChannel channel = FileChannel.open(regionFile.toPath(), StandardOpenOption.READ)){
+            if(channel.size() < 8192) {
+                ChunkCleaner.getInstance().getLogger().warning("Skipping empty or invalid region file | " + regionFile.getName());
+                return;
+            }
+            //REBUILDING HEADER TO PREVENT DAMAGE
+            ByteBuffer header = ByteBuffer.allocate(4096);
+            channel.read(header);
+            header.flip();
+            for(int i = 0; i < 1024; i++) {
+                int entry = header.getInt(i*4);//HEXA Steps
+                if(entry == 0)
+                    continue;
+                totalChunksInFile++;
+                int locationOffset = (entry >> 8) * 4096;
+                ByteBuffer chunkHeader = ByteBuffer.allocate(5);
+                channel.read(chunkHeader, locationOffset);
+                chunkHeader.flip();
+                int chunkLength = chunkHeader.getInt() -1;
+                byte compressionType = chunkHeader.get();
+                if(chunkLength <= 0)
+                    continue;
+                if(compressionType != 2) {
+                    ChunkCleaner.getInstance().getLogger().warning("Other compression type at index " + i + " in region file " + regionFile.getName() + " | The other compression type: " + compressionType);
+                    continue;
+                }
+                ByteBuffer chunkDataBuffer = ByteBuffer.allocate(chunkLength);
+                channel.read(chunkDataBuffer, locationOffset + 5);
+                chunkDataBuffer.flip();
+
+                if(shouldDeleteChunk(chunkDataBuffer)) {
+                    int regionX = getRegion(regionFile, 1);
+                    int regionZ = getRegion(regionFile, 2);
+                    int localX = i % 32;
+                    int localZ = i / 32;
+                    int chunkX = regionX  * 32 + localX;
+                    int chunkZ  = regionZ * 32 + localZ;
+
+                    if(Bukkit.getOnlinePlayers()
+                            .stream().noneMatch(p ->
+                                    p.getLocation().getChunk().getX() == chunkX && p.getLocation().getChunk().getZ() == chunkZ))
+                        chunksToDelete.add(new ChunkCoordinates(chunkX, chunkZ));
+                }
+            }
+            handleFileModification(regionFile, chunksToDelete, totalChunksInFile);
+        } catch (IOException ioException) {
+            USER.sendMessage(ChunkCleaner.PREFIX + "Failed to process region file " +regionFile.getName() + " see the console for more information!");
+            ChunkCleaner.getInstance().getLogger().severe("Failed to process region file "+regionFile.getName()  + " due to | " + ioException.getMessage());
+        }
+    }
+
+
 
     private void handleFileModification(File regionFile, Set<ChunkCoordinates> chunksToDelete, int totalChunks) {
         boolean allChunksDeleted = totalChunks > 0 && chunksToDelete.size() == totalChunks;

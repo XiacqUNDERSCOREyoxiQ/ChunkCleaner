@@ -43,5 +43,5 @@ public class DeleteChunksCommand implements CommandExecutor {
                 return true;
         return false;
     }
-    private void startDeletion(CommandSender sender, World world, boolean resume) {new Deletion(sender, world, ChunkCleaner.getInstance().getConfig().getInt("inhibited_time")).startDeletion(resume);}
+    private void startDeletion(CommandSender sender, World world, boolean resume) {new Deletion(sender, world).startDeletion(resume);}
 }
