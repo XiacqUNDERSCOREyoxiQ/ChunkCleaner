@@ -20,9 +20,11 @@ public class ChunkInfoCommand implements CommandExecutor {
             sender.sendMessage(ChunkCleaner.PREFIX + "You don't have the required permissions to execute this command!");
         return false;
     }
-
-
     private void printChunkInfo(Player player) {
-        player.sendMessage("Print.");
+        player.sendMessage("----------------{§5ChunkCleaner§f}---------------");
+        player.sendMessage("§5>§r Chunk InhabitedTime " + player.getLocation().getChunk().getInhabitedTime()/20 + " §8| §7§o(Side note this time is only a rough estimate not the actual nbt data that is used for removal)") ;
+        player.sendMessage("§5>§r HasTileEntities " + (player.getLocation().getChunk().getTileEntities().length > 0));
+        player.sendMessage("§5>§r Keep ? " + (player.getLocation().getChunk().getTileEntities().length > 0 || player.getLocation().getChunk().getInhabitedTime()/20 >= ChunkCleaner.getInstance().getConfig().getInt("inhibitedTime")));
+        player.sendMessage("---------------------------------------------");
     }
 }
