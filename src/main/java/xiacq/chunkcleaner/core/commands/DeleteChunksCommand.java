@@ -5,7 +5,8 @@ import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.jspecify.annotations.NonNull;
+
+import org.checkerframework.checker.nullness.qual.NonNull;
 import xiacq.chunkcleaner.ChunkCleaner;
 import xiacq.chunkcleaner.core.utility.Deletion;
 

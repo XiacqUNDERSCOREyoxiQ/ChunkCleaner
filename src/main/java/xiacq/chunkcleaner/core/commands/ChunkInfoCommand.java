@@ -5,12 +5,12 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NonNull;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import xiacq.chunkcleaner.ChunkCleaner;
 
 public class ChunkInfoCommand implements CommandExecutor {
     @Override
-    public boolean onCommand(@NonNull CommandSender sender,@NonNull Command command,@NonNull String label, String @NonNull[] args) {
+    public boolean onCommand(@NonNull CommandSender sender, @NonNull Command command, @NonNull String label, String @NonNull[] args) {
         if(sender instanceof Player player && player.hasPermission("CC.ChunkInfo"))
             if(args.length == 0)
                 printChunkInfo(player);

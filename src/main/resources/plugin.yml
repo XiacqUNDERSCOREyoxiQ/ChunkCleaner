@@ -1,8 +1,11 @@
 name: ChunkCleaner
-version: 1.0
+version: 1.0.1
 api-version: 1.21
 main: xiacq.chunkcleaner.ChunkCleaner
 author: Xiacq_yoxiQ
+depend:
+  - ItemsAdder
 commands:
   ChunkInfo:
   DeleteChunks:
+  RandomTick:
